@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kaffeemaschine – UI‑Simulator</title>
+  <style>
+    :root{
+      --bg:#0b0d12; --card:#1a1f2b; --muted:#8892a6; --text:#e9ecf1; --accent:#7aa2ff; --ok:#19c37d; --warn:#f2a100; --err:#ff5c5c;
+      --radius:14px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .app{max-width:980px;margin:0 auto;padding:16px}
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
+    .brand{font-weight:700;letter-spacing:.2px}
+    .chip{display:inline-flex;align-items:center;gap:8px;background:#121621;border:1px solid #202636;padding:8px 12px;border-radius:999px}
+    .toolbar{display:flex;flex-wrap:wrap;gap:10px}
+    button, .btn{appearance:none;border:1px solid #2a3346;background:#161a24;color:var(--text);padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+    button:hover,.btn:hover{border-color:#3b4660}
+    .view-switch{display:flex;gap:6px;background:#10151f;border:1px solid #202636;padding:6px;border-radius:999px}
+    .view-switch button{border:none;background:transparent;padding:8px 12px;border-radius:999px}
+    .view-switch button.active{background:var(--accent);color:#061123}
+
+    .frame{border:1px solid #212b3b;border-radius:var(--radius);overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .statusbar{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#0e1420;border-bottom:1px solid #202636}
+    .status{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px}
+    .gear{width:36px;height:36px;display:grid;place-items:center;border:1px solid #2a3346;border-radius:10px;cursor:pointer}
+
+    .content{padding:14px}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .tile{background:var(--card);border:1px solid #2a3346;border-radius:12px;padding:18px;min-height:110px;display:flex;flex-direction:column;justify-content:center}
+    .tile h3{margin:0 0 6px 0;font-size:18px}
+    .tile small{color:var(--muted)}
+
+    .two-col{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+    .list{padding:8px 0 0 18px;margin:0 0 14px 0}
+    .footer{padding:10px 12px;background:#0e1420;border-top:1px solid #202636;font-size:13px;color:var(--muted)}
+
+    @media (max-width:860px){ .grid{grid-template-columns:repeat(2,1fr)} }
+    @media (max-width:560px){ .grid{grid-template-columns:1fr} .two-col{grid-template-columns:1fr} }
+
+    .toast{position:fixed;inset:auto 16px 16px auto;background:#0f1420;border:1px solid #2a3346;color:var(--text);padding:10px 14px;border-radius:10px;opacity:0;transform:translateY(8px);transition:.25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    .hidden{display:none !important}
+
+    /* Vollbild-Brew-Overlay */
+    .overlay{position:fixed;inset:0;background:linear-gradient(180deg,#0b0d12 0%, #0f1420 100%);z-index:9999;display:flex;flex-direction:column}
+    .overlay.hidden{display:none}
+    .overlay-header{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0e1420;border-bottom:1px solid #202636}
+    .overlay-title{font-weight:700}
+    .overlay-body{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px;align-items:center}
+    .overlay-card{background:#121621;border:1px solid #202636;border-radius:14px;padding:16px;min-height:220px;display:flex;flex-direction:column;justify-content:center}
+    .overlay-status{font-size:22px;margin:0 0 6px 0}
+    .overlay-sub{color:#8892a6;margin:0 0 12px 0}
+    .progress{height:12px;border-radius:999px;background:#0b0f18;border:1px solid #2a3346;overflow:hidden}
+    .progress > div{height:100%;width:0%;background:#7aa2ff;transition:width .4s}
+    .imgbox{background:#0b0f18;border:1px dashed #2a3346;border-radius:12px;display:grid;place-items:center;min-height:220px;overflow:hidden}
+    .imgbox img{max-width:100%;max-height:260px;display:block}
+    .overlay-footer{display:flex;gap:10px;justify-content:flex-end;padding:12px 16px;background:#0e1420;border-top:1px solid #202636}
+    .btn-ghost{background:transparent;border-color:#2a3346}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">☕ Kaffeemaschine – UI‑Simulator</div>
+    <div class="toolbar">
+      <div class="chip">Temp: <span id="temp">25.0</span>°C · Soll: <span id="tset">85</span>°C · Heizung: <span id="hstat">OFF</span> · Pumpe: <span id="pstat">OFF</span></div>
+      <div class="view-switch">
+        <button id="v-screen" class="active">Bildschirm</button>
+        <button id="v-app">App</button>
+        <button id="v-web">Webseite</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="frame">
+    <div class="statusbar">
+      <div id="title">Menü Kaffeemaschine</div>
+      <div class="status">
+        <span>WLAN: <strong id="wlan">AUS</strong></span>
+        <span>BLE: <strong id="ble">AN</strong></span>
+        <div id="gear" class="gear" title="Einstellungen"><span>⚙️</span></div>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- MAIN -->
+      <section id="screen-main" class="view">
+        <div class="grid" id="drinks-grid"></div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="screen-settings" class="view hidden">
+        <div id="settings-grid" class="two-col"></div>
+      </section>
+
+      <!-- WIFI PAGE (only on Bildschirm) -->
+      <section id="screen-wifi" class="view hidden">
+        <h2>WLAN‑Einstellungen</h2>
+        <p>Status: <strong id="wifi-state">AUS</strong></p>
+        <div class="two-col">
+          <button id="btn-wifi-toggle">WLAN umschalten</button>
+          <button id="btn-wifi-config">WLAN konfigurieren (Demo)</button>
+        </div>
+        <p><small>Hinweis: In App und Webseite nicht verfügbar.</small></p>
+        <button id="back-from-wifi" style="margin-top:12px">Zurück</button>
+      </section>
+
+      <!-- BLUETOOTH PAGE -->
+      <section id="screen-ble" class="view hidden">
+        <h2>Bluetooth</h2>
+        <p>Status: <strong id="ble-state">AN</strong></p>
+        <button id="btn-ble-toggle">Bluetooth umschalten</button>
+        <button id="back-from-ble" style="margin-left:8px">Zurück</button>
+      </section>
+
+      <!-- QUEUE PAGE -->
+      <section id="screen-queue" class="view hidden">
+        <h2>Warteschlange</h2>
+        <ol id="queue-list" class="list"></ol>
+        <div class="two-col">
+          <button id="btn-start-next">Nächste starten</button>
+          <button id="btn-clear-queue">Warteschlange leeren</button>
+        </div>
+        <p style="margin-top:10px"><small>Tipp: Getränke im Hauptmenü anklicken, um sie der Warteschlange hinzuzufügen (App/Web) oder direkt zu starten (Bildschirm).</small></p>
+        <button id="back-from-queue" style="margin-top:12px">Zurück</button>
+      </section>
+
+      <!-- CREDITS PAGE -->
+      <section id="screen-credits" class="view hidden">
+        <h2>Credits</h2>
+        <p>Eigene Darstellung, KI-generiert mit OpenAI DALL·E (ChatGPT, GPT-5, 2025).</p>
+        <button id="back-from-credits">Zurück</button>
+      </section>
+
+      <!-- IMAGES PAGE -->
+      <section id="screen-images" class="view hidden">
+        <h2>Bilder für Overlay</h2>
+        <p>Wähle ein Bild, das im Overlay **dauerhaft** angezeigt wird – auch nach dem Schließen der Seite (Speicherung im Browser).</p>
+        <div class="two-col">
+          <div class="tile">
+            <h3>Bild auswählen</h3>
+            <input id="img-input" type="file" accept="image/*" />
+            <p class="overlay-sub">Vorschau:</p>
+            <div class="imgbox" style="min-height:180px"><img id="img-preview" alt="Vorschau" /></div>
+          </div>
+          <div class="tile">
+            <h3>Aktionen</h3>
+            <button id="btn-apply-img">Nur für diese Sitzung verwenden</button>
+            <button id="btn-save-img" style="margin-top:8px">Bild fix speichern</button>
+            <button id="btn-clear-img" class="btn-ghost" style="margin-top:8px">Gespeichertes Bild löschen</button>
+            <p class="overlay-sub">Gespeicherte Bilder werden komprimiert und im lokalen Speicher des Browsers abgelegt.</p>
+            <button id="back-from-images" style="margin-top:8px">Zurück</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="footer">
+      <span id="footer-msg">Bereit.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Vollbild-Overlay während des Programms -->
+<div id="brew-overlay" class="overlay hidden" role="dialog" aria-modal="true">
+  <div class="overlay-header">
+    <div class="overlay-title">Menü Kaffeemaschine</div>
+    <div class="chip">Status: <span id="ovl-stage">Bereit</span></div>
+  </div>
+  <div class="overlay-body">
+    <div class="overlay-card">
+      <h2 class="overlay-status" id="ovl-status">Aufheizen…</h2>
+      <p class="overlay-sub" id="ovl-sub">Getränk: <span id="ovl-drink">–</span></p>
+      <div class="progress" aria-label="Fortschritt">
+        <div id="ovl-progress" style="width:0%"></div>
+      </div>
+      <p class="overlay-sub" style="margin-top:10px">Temp: <span id="ovl-temp">25.0</span>°C · Soll: <span id="ovl-tset">85</span>°C · Heizung: <span id="ovl-heat">OFF</span> · Pumpe: <span id="ovl-pump">OFF</span></p>
+    </div>
+    <div class="imgbox" id="ovl-imgbox">
+      <img id="ovl-img" alt="Bild aus dem Dokument" />
+      <span id="ovl-placeholder" style="color:#8892a6">Kein dauerhaftes Bild gesetzt. Wähle eins unter „Bilder (Overlay)“.</span>
+    </div>
+  </div>
+  <div class="overlay-footer">
+    <button id="ovl-close" class="btn btn-ghost">Schließen</button>
+  </div>
+</div>
+
+<div id="toast" class="toast">Aktion ausgeführt</div>
+
+<script>
+// ---------- State ----------
+const state = {
+  viewMode: 'screen', // 'screen' | 'app' | 'web'
+  screen: 'main',     // main | settings | wifi | ble | queue | credits | images
+  wifi: false,
+  ble: true,
+  temp: 25.0,
+  tset: 85,
+  heater: false,
+  pump: false,
+  queue: []
+};
+
+const profiles = [
+  {name:'Espresso', pump:25},
+  {name:'Lungo', pump:35},
+  {name:'Americano', pump:20},
+  {name:'Cappuccino', pump:30},
+  {name:'Kaffee normal', pump:30},
+  {name:'Kaffee klein', pump:20},
+];
+
+// A little heater/pump simulation
+let brewTimer = null;
+function simulateBrewStart(name){
+  openOverlay(name, 'Aufheizen…', 10);
+  state.heater = true; state.pump = false; updateStatus();
+  clearTimeout(brewTimer);
+  brewTimer = setTimeout(()=>{
+    state.heater=false; state.pump=true; updateStatus();
+    updateOverlayStage('Brühen…', 60);
+    setTimeout(()=>{ state.pump=false; updateStatus(); updateOverlayStage('Fertig', 100); closeOverlayDelayed(); }, 2500);
+  }, 1200);
+}
+
+// ---------- DOM refs ----------
+const el = (id)=>document.getElementById(id);
+const footer = el('footer-msg');
+const wlan = el('wlan');
+const ble = el('ble');
+const temp = el('temp');
+const tset = el('tset');
+const hstat = el('hstat');
+const pstat = el('pstat');
+const gear = el('gear');
+const toastEl = el('toast');
+
+// Views
+const views = {
+  main: el('screen-main'),
+  settings: el('screen-settings'),
+  wifi: el('screen-wifi'),
+  ble: el('screen-ble'),
+  queue: el('screen-queue'),
+  credits: el('screen-credits'),
+  images: el('screen-images'),
+};
+
+// Top view mode switcher
+el('v-screen').onclick=()=>setViewMode('screen');
+el('v-app').onclick=()=>setViewMode('app');
+el('v-web').onclick=()=>setViewMode('web');
+
+function setViewMode(m){
+  state.viewMode = m;
+  document.querySelectorAll('.view-switch button').forEach(b=>b.classList.remove('active'));
+  el('v-'+m).classList.add('active');
+  renderSettingsTiles();
+  setScreen('main');
+  footer.textContent = 'Ansicht: '+(m==='screen'?'Bildschirm':m==='app'?'App':'Webseite');
+}
+
+// ---------- Navigation ----------
+gear.onclick = ()=> setScreen('settings');
+
+function setScreen(s){
+  state.screen = s;
+  for(const k in views){ views[k].classList.add('hidden'); }
+  views[s].classList.remove('hidden');
+  document.getElementById('title').textContent =
+    s==='main' ? 'Menü Kaffeemaschine' :
+    s==='settings' ? 'Einstelungen' :
+    s==='wifi' ? 'WLAN‑Einstellungen' :
+    s==='ble' ? 'Bluetooth' :
+    s==='queue' ? 'Warteschlange' :
+    s==='images' ? 'Bilder (Overlay)' :
+    s==='credits' ? 'Credits' : 'Kaffeemaschine';
+  footer.textContent = 'Bereit.';
+}
+
+// ---------- Build UI ----------
+const drinksGrid = el('drinks-grid');
+function renderDrinks(){
+  drinksGrid.innerHTML = '';
+  const order = ['Espresso','Lungo','Americano','Cappuccino','Kaffee normal','Kaffee klein'];
+  order.forEach(name=>{
+    const p = profiles.find(x=>x.name===name);
+    const card = document.createElement('div');
+    card.className='tile';
+    card.innerHTML = `<h3>${name}</h3><small>Pumpe: ${p.pump}s</small>`;
+    card.onclick = ()=>{
+      if(state.viewMode==='screen'){
+        simulateBrewStart(name);
+      } else {
+        state.queue.push(name); renderQueue(); toast(name+' zur Warteschlange hinzugefügt');
+      }
+    };
+    drinksGrid.appendChild(card);
+  });
+}
+
+const settingsGrid = el('settings-grid');
+function settingsTile(label, onClick){
+  const d=document.createElement('div'); d.className='tile';
+  d.innerHTML = `<h3>${label}</h3><small>Öffnen</small>`;
+  d.onclick=onClick; return d;
+}
+function renderSettingsTiles(){
+  settingsGrid.innerHTML='';
+  if(state.viewMode==='screen'){
+    settingsGrid.appendChild(settingsTile('WLAN‑Einstellungen', ()=>setScreen('wifi')));
+  }
+  settingsGrid.appendChild(settingsTile('Bluetooth', ()=>setScreen('ble')));
+  settingsGrid.appendChild(settingsTile('Warteschlange', ()=>setScreen('queue')));
+  settingsGrid.appendChild(settingsTile('Bilder (Overlay)', ()=>setScreen('images')));
+  settingsGrid.appendChild(settingsTile('Credits', ()=>setScreen('credits')));
+}
+
+// WIFI page
+el('btn-wifi-toggle').onclick=()=>{ state.wifi=!state.wifi; updateStatus(); el('wifi-state').textContent = state.wifi?'AN':'AUS'; toast('WLAN '+(state.wifi?'aktiviert':'deaktiviert')); };
+el('btn-wifi-config').onclick=()=>{ toast('Demo: Formular zum Verbinden (nicht echt)'); };
+el('back-from-wifi').onclick=()=> setScreen('settings');
+
+// BLE page
+el('btn-ble-toggle').onclick=()=>{ state.ble=!state.ble; updateStatus(); el('ble-state').textContent = state.ble?'AN':'AUS'; toast('Bluetooth '+(state.ble?'aktiviert':'deaktiviert')); };
+el('back-from-ble').onclick=()=> setScreen('settings');
+
+// Queue page
+el('btn-start-next').onclick=()=>{
+  if(state.queue.length){ const n=state.queue.shift(); renderQueue(); simulateBrewStart(n); }
+  else toast('Warteschlange ist leer');
+};
+el('btn-clear-queue').onclick=()=>{ state.queue.length=0; renderQueue(); toast('Warteschlange geleert'); };
+el('back-from-queue').onclick=()=> setScreen('settings');
+
+function renderQueue(){
+  const list = el('queue-list'); list.innerHTML='';
+  if(!state.queue.length){ list.innerHTML='<li>(leer)</li>'; return; }
+  state.queue.forEach((n,i)=>{
+    const li=document.createElement('li');
+    li.textContent = (i+1)+') '+n;
+    list.appendChild(li);
+  });
+}
+
+// ---------- Status ----------
+function updateStatus(){
+  wlan.textContent = state.wifi?'AN':'AUS';
+  ble.textContent  = state.ble?'AN':'AUS';
+  temp.textContent = state.temp.toFixed(1);
+  tset.textContent = state.tset;
+  hstat.textContent= state.heater?'ON':'OFF';
+  pstat.textContent= state.pump?'ON':'OFF';
+  // Overlay live-Daten
+  const ot=document.getElementById('ovl-temp'); if(ot){ ot.textContent = state.temp.toFixed(1); }
+  const os=document.getElementById('ovl-tset'); if(os){ os.textContent = state.tset; }
+  const oh=document.getElementById('ovl-heat'); if(oh){ oh.textContent = state.heater?'ON':'OFF'; }
+  const op=document.getElementById('ovl-pump'); if(op){ op.textContent = state.pump?'ON':'OFF'; }
+}
+
+// Temp drift simulation
+setInterval(()=>{
+  const target = state.heater ? state.tset : 25;
+  state.temp += (target - state.temp) * 0.08; // ease
+  updateStatus();
+}, 500);
+
+// ---------- Overlay ----------
+const overlay = document.getElementById('brew-overlay');
+function openOverlay(drink, stage, prog){
+  document.getElementById('ovl-drink').textContent = drink;
+  document.getElementById('ovl-status').textContent = stage;
+  document.getElementById('ovl-stage').textContent = stage;
+  document.getElementById('ovl-progress').style.width = (prog||0)+"%";
+  if(overlayImgURL){ document.getElementById('ovl-img').src = overlayImgURL; document.getElementById('ovl-placeholder').style.display='none'; }
+  overlay.classList.remove('hidden');
+}
+function updateOverlayStage(stage, prog){
+  document.getElementById('ovl-status').textContent = stage;
+  document.getElementById('ovl-stage').textContent = stage;
+  if(typeof prog==='number') document.getElementById('ovl-progress').style.width = prog+"%";
+}
+function closeOverlay(){ overlay.classList.add('hidden'); }
+function closeOverlayDelayed(){ setTimeout(closeOverlay, 900); }
+document.getElementById('ovl-close').onclick=closeOverlay;
+
+// ---------- Persistentes Bild (localStorage) ----------
+const LS_KEY = 'overlayImgData';  // gespeichertes Bild (DataURL)
+
+let overlayImgURL = '';           // aktuell verwendetes Bild (Sitzung)
+let savedImgURL = localStorage.getItem(LS_KEY) || ''; // dauerhaft gespeichertes Bild
+
+function applySavedImageIfAny(){
+  if(savedImgURL){
+    overlayImgURL = savedImgURL;
+    const img = document.getElementById('ovl-img');
+    img.src = overlayImgURL;
+    const ph = document.getElementById('ovl-placeholder');
+    if(ph) ph.style.display = 'none';
+  }
+}
+
+// Bilder laden & speichern
+document.getElementById('img-input').addEventListener('change', async (e)=>{
+  const f=e.target.files[0]; if(!f) return;
+  const dataURL = await readAndCompressImage(f, 1280, 720, 0.85);
+  document.getElementById('img-preview').src = dataURL;
+});
+
+document.getElementById('btn-apply-img').onclick=()=>{
+  const src = document.getElementById('img-preview').src;
+  if(!src){ toast('Kein Bild gewählt'); return; }
+  overlayImgURL = src;
+  document.getElementById('ovl-img').src = src;
+  const ph=document.getElementById('ovl-placeholder'); if(ph) ph.style.display='none';
+  toast('Bild für diese Sitzung gesetzt');
+};
+
+document.getElementById('btn-save-img').onclick=()=>{
+  const src = document.getElementById('img-preview').src;
+  if(!src){ toast('Kein Bild gewählt'); return; }
+  try{
+    localStorage.setItem(LS_KEY, src);
+    savedImgURL = src;
+    overlayImgURL = src;
+    document.getElementById('ovl-img').src = src;
+    const ph=document.getElementById('ovl-placeholder'); if(ph) ph.style.display='none';
+    toast('Bild dauerhaft gespeichert');
+  }catch(err){
+    console.error(err);
+    toast('Konnte Bild nicht speichern (zu groß?)');
+  }
+};
+
+document.getElementById('btn-clear-img').onclick=()=>{
+  localStorage.removeItem(LS_KEY);
+  savedImgURL = '';
+  toast('Gespeichertes Bild gelöscht');
+};
+
+// Hilfsfunktion: Bild lesen & komprimieren (Canvas)
+function readAndCompressImage(file, maxW, maxH, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>{
+      const img = new Image();
+      img.onload = ()=>{
+        // Skalierung berechnen
+        let {width:w, height:h} = img;
+        const ratio = Math.min(maxW / w, maxH / h, 1);
+        const nw = Math.round(w * ratio);
+        const nh = Math.round(h * ratio);
+        // auf Canvas zeichnen
+        const canvas = document.createElement('canvas');
+        canvas.width = nw; canvas.height = nh;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, nw, nh);
+        // als JPEG exportieren (kleinere Größe als PNG)
+        const dataURL = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataURL);
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- Toast ----------
+let toastT;
+function toast(msg){
+  toastEl.textContent = msg; toastEl.classList.add('show');
+  clearTimeout(toastT); toastT=setTimeout(()=>toastEl.classList.remove('show'), 1500);
+}
+
+// ---------- Init ----------
+applySavedImageIfAny();
+renderDrinks(); renderSettingsTiles(); renderQueue(); updateStatus();
+setScreen('main');
+</script>
+</body>
+</html>
